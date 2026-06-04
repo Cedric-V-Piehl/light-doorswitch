@@ -1,0 +1,75 @@
+blueprint:
+  name: "Tür &amp; RSSI LED Steuerung"
+  description: "Schaltet eine Lampe ein, wenn die Tür geöffnet wird und das Handy-WLAN stark ist. Schaltet ab, sobald das Signal schwach wird."
+  domain: automation
+  input:
+    door_sensor:
+      name: Tür-Sensor
+      description: Der Sensor an der Tür (wechselt von off zu on).
+      selector:
+        entity:
+          domain: binary_sensor
+    led_entity:
+      name: LED-Leiste / Lampe
+      description: Die Lampe oder Steckdose, die geschaltet werden soll.
+      selector:
+        entity:
+          domain:
+            - light
+            - switch
+    rssi_sensor:
+      name: Handy RSSI Sensor
+      description: Der Sensor, der die Signalstärke deines Handys in dBm misst.
+      selector:
+        entity:
+          domain: sensor
+    rssi_threshold:
+      name: RSSI Schwellenwert
+      description: Fällt der Wert unter diese Zahl (z. B. -60), geht die LED aus.
+      default: -60
+      selector:
+        number:
+          min: -100
+          max: 0
+          step: 1
+          unit_of_measurement: dBm
+          mode: slider
+
+mode: single
+
+trigger:
+  - platform: state
+    entity_id: !input door_sensor
+    from: "off"
+    to: "on"
+    id: "tuer_wird_geoeffnet"
+
+  - platform: numeric_state
+    entity_id: !input rssi_sensor
+    below: !input rssi_threshold
+    id: "wlan_wird_schwach"
+
+condition: []
+
+action:
+  - choose:
+      # Option 1: Tür geht auf UND das WLAN-Signal ist über dem Schwellenwert
+      - conditions:
+          - condition: trigger
+            id: "tuer_wird_geoeffnet"
+          - condition: numeric_state
+            entity_id: !input rssi_sensor
+            above: !input rssi_threshold
+        sequence:
+          - action: homeassistant.turn_on
+            target:
+              entity_id: !input led_entity
+
+      # Option 2: Das WLAN-Signal fällt unter den Schwellenwert
+      - conditions:
+          - condition: trigger
+            id: "wlan_wird_schwach"
+        sequence:
+          - action: homeassistant.turn_off
+            target:
+              entity_id: !input led_entity
